@@ -3,9 +3,6 @@
 // Dessin piste + corridor + crosswind + panneau piste
 // ======================================================
 
-import { haversineDistance } from "./helpers.js";
-
-
 // ------------------------------------------------------
 // Logging PRO+
 // ------------------------------------------------------
@@ -64,7 +61,7 @@ export function drawRunway(runway, layer) {
     const r = RUNWAYS[runway];
     if (!r) return;
 
-    L.polyline(r.coords, {
+    L.polyline([r.start, r.end], {
         color: "#ffffff",
         weight: 4,
         opacity: 0.9
