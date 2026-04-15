@@ -21,10 +21,10 @@ const log = (...a) => IS_DEV && console.log("[CONFIG]", ...a);
 export const PROXY = "https://eblg-dashboard-v84.onrender.com";
 
 export const ENDPOINTS = {
-    metar: `${PROXY}/metar`,
-    taf:   `${PROXY}/taf`,
-    fids:  `${PROXY}/fids`,
-    sonos: `${PROXY}/sonos`
+    metar: "/metar",
+    taf: "/taf",
+    fids: "/fids",
+    sonometers: "/sonos"   // ← CORRECTION CRITIQUE
 };
 
 log("Endpoints configurés :", ENDPOINTS);
