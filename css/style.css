@@ -293,3 +293,22 @@ h2 {
     h2 { font-size: 14px; }
     .float-btn { font-size: 11px; padding: 5px 8px; }
 }
+/* ======================================================
+   PURGE DES MENUS FANTÔMES
+====================================================== */
+
+.menu,
+.controls,
+.map-controls,
+.right-menu,
+.old-buttons,
+#old-menu,
+#heatmap-menu,
+#cluster-menu,
+#history-menu {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    position: absolute !important;
+}
