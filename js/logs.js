@@ -1,4 +1,4 @@
-import { PROXY } from "./config.js";
+import { API_BASE } from "./config.js";
 
 const logsPanel = document.getElementById("logs-panel");
 const logs = []; // historique rotatif
