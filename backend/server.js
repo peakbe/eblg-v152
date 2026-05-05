@@ -1,3 +1,10 @@
+// ===============================================
+// SERVER.JS — VERSION PRO+ AUTONOME EBLG
+// METAR / TAF via CheckWX
+// FIDS autonome cargo réaliste
+// Sonomètres locaux
+// ===============================================
+
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
@@ -8,7 +15,9 @@ import { SONOMETERS } from "./sonometers-data.js";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Résolution du chemin absolu vers le frontend
+// =========================
+// PATHS FRONTEND
+// =========================
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND = path.join(__dirname, "..");
 
@@ -22,12 +31,11 @@ app.use(cors({
 }));
 
 // =========================
-// CACHE PRO+
+// CACHE PRO+ (METAR / TAF)
 // =========================
 const cache = {
     metar: { ts: 0, data: null },
-    taf: { ts: 0, data: null },
-
+    taf: { ts: 0, data: null }
 };
 
 function getCache(key, ttl = 60000) {
@@ -45,7 +53,7 @@ function setCache(key, data) {
 }
 
 // =========================
-// FETCH PRO+
+// FETCH PRO+ SÉCURISÉ
 // =========================
 async function safeFetch(url) {
     try {
@@ -59,7 +67,6 @@ async function safeFetch(url) {
         }
 
         return JSON.parse(text);
-
     } catch (err) {
         console.error("[FETCH EXCEPTION]", err);
         return { fallback: true };
@@ -67,37 +74,7 @@ async function safeFetch(url) {
 }
 
 // =========================
-// FIDS FALLBACK
-// =========================
-function generateDynamicFids() {
-    const now = new Date();
-    const baseHour = now.getHours();
-    const pad = n => String(n).padStart(2, "0");
-
-    const flights = [
-        { flight: "QY123", destination: "LEJ" },
-        { flight: "X7182", destination: "TLV" },
-        { flight: "QR8962", destination: "DOH" },
-        { flight: "ET3721", destination: "ADD" },
-        { flight: "TK6543", destination: "IST" },
-        { flight: "3V450", destination: "CGN" },
-        { flight: "RU927", destination: "SVO" },
-        { flight: "K4972", destination: "CVG" }
-    ];
-
-    const statuses = ["Departed", "Boarding", "Loading", "Scheduled", "Delayed"];
-
-    return flights.map((f, i) => ({
-        flight: f.flight,
-        destination: f.destination,
-        time: `${pad((baseHour + i) % 24)}:${pad((10 + i * 7) % 60)}`,
-        status: statuses[i % statuses.length],
-        fallback: true
-    }));
-}
-
-// =========================
-// API ROUTES
+// ROUTES API
 // =========================
 
 // METAR
@@ -149,19 +126,16 @@ app.get("/taf", async (req, res) => {
 // ===============================================
 // FIDS PRO+ AUTONOME — EBLG Cargo realistic
 // ===============================================
-
 app.get("/fids", (req, res) => {
     const now = new Date();
     const baseHour = now.getHours();
     const baseMin = now.getMinutes();
 
-    // Destinations cargo réalistes EBLG
     const destinations = [
         "LEJ", "CGN", "SVO", "IST", "DOH",
         "CVG", "ADD", "TLV", "DXB", "BUD"
     ];
 
-    // Statuts dynamiques
     const statuses = [
         "Scheduled",
         "Loading",
@@ -188,14 +162,12 @@ app.get("/fids", (req, res) => {
     res.json(flights);
 });
 
-// Générateur de numéros de vols cargo
 function generateFlightNumber() {
     const prefixes = ["QY", "3V", "RU", "TK", "QR", "ET", "X7", "K4"];
     const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
     const num = Math.floor(100 + Math.random() * 900);
     return prefix + num;
 }
-
 
 // SONOMETERS
 app.get("/sonos", (req, res) => {
@@ -211,5 +183,5 @@ app.use(express.static(FRONTEND));
 // START SERVER
 // =========================
 app.listen(PORT, () => {
-    console.log("[PROXY] Running on port", PORT);
+    console.log("[BACKEND PRO+] Running on port", PORT);
 });
