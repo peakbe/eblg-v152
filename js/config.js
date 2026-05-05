@@ -24,7 +24,7 @@ export const ENDPOINTS = {
     metar: `${API_BASE}/metar`,
     taf: `${API_BASE}/taf`,
     fids: `${API_BASE}/fids`,
-    sonometers: `${API_BASE}/sonos`
+    sonometers: `${API_BASE}/sono`
 };
 
 
