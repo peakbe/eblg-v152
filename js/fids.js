@@ -1,19 +1,14 @@
 // ======================================================
 // FIDS — VERSION PRO+
-// Chargement sécurisé, logs propres, UI robuste.
+// Chargement sécurisé, UI compacte, fallback clair.
 // ======================================================
 
 import { ENDPOINTS } from "./config.js";
-import { fetchJSON } from "./helpers.js";
+import { fetchJSON, updateStatusPanel } from "./helpers.js";
 
-
-// ------------------------------------------------------
-// Logging PRO+
-// ------------------------------------------------------
-const IS_DEV = location.hostname.includes("localhost") || location.hostname.includes("127.0.0.1");
+const IS_DEV = location.hostname.includes("localhost");
 const log = (...a) => IS_DEV && console.log("[FIDS]", ...a);
 const logErr = (...a) => console.error("[FIDS ERROR]", ...a);
-
 
 // ------------------------------------------------------
 // Chargement sécurisé
@@ -27,55 +22,51 @@ export async function safeLoadFids() {
     }
 }
 
-
 // ------------------------------------------------------
 // Chargement brut
 // ------------------------------------------------------
 export async function loadFids() {
     const data = await fetchJSON(ENDPOINTS.fids);
     updateFidsUI(data);
+    updateStatusPanel("FIDS", data);
 }
-
 
 // ------------------------------------------------------
 // Mise à jour UI
 // ------------------------------------------------------
 export function updateFidsUI(data) {
-    const container = document.getElementById("fids");
-    if (!container) return;
+    const el = document.getElementById("fids-list");
+    if (!el) return;
 
-    // Détection fallback dynamique (backend renvoie un tableau)
-    if (Array.isArray(data) && data.length && data[0].fallback === true) {
-        container.innerHTML = `<div class="fids-row fids-unknown">FIDS indisponible (fallback)</div>`;
+    el.innerHTML = "";
+
+    if (!Array.isArray(data) || !data.length) {
+        el.innerHTML = `<div class="fids-row">Aucun départ disponible</div>`;
         return;
     }
 
-    // Données réelles
-    const flights = Array.isArray(data) ? data : [];
-    container.innerHTML = "";
+    const isFallback = data.some(f => f.fallback);
 
-    if (!flights.length) {
-        container.innerHTML = `<div class="fids-row fids-unknown">Aucun vol disponible</div>`;
-        return;
-    }
-
-    flights.forEach(flight => {
-        const statusText = (flight.status || "").toLowerCase();
-
-        let cssClass = "fids-unknown";
-        if (statusText.includes("on time")) cssClass = "fids-on-time";
-        if (statusText.includes("delayed")) cssClass = "fids-delayed";
-        if (statusText.includes("cancel")) cssClass = "fids-cancelled";
-        if (statusText.includes("board")) cssClass = "fids-boarding";
-
+    data.forEach(f => {
         const row = document.createElement("div");
-        row.className = `fids-row ${cssClass}`;
+        row.className = "fids-row";
+
         row.innerHTML = `
-            <span>${flight.flight || "-"}</span>
-            <span>${flight.destination || "-"}</span>
-            <span>${flight.time || "-"}</span>
-            <span>${flight.status || "-"}</span>
+            <span class="fids-flight">${f.flight}</span>
+            <span class="fids-dest">${f.destination}</span>
+            <span class="fids-time">${f.time}</span>
+            <span class="fids-status ${f.status?.toLowerCase() || ""}">
+                ${f.status || "—"}
+            </span>
         `;
-        container.appendChild(row);
+
+        el.appendChild(row);
     });
+
+    if (isFallback) {
+        const fb = document.createElement("div");
+        fb.className = "fids-fallback";
+        fb.textContent = "Données FIDS simulées (fallback).";
+        el.appendChild(fb);
+    }
 }
