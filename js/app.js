@@ -35,6 +35,12 @@ window.addEventListener("DOMContentLoaded", () => {
             document.getElementById(`panel-${tab}`).classList.remove("hidden");
         });
     });
+    
+import { resetMapView } from "./map.js";
+
+document.getElementById("btn-reset-zoom").addEventListener("click", () => {
+    resetMapView();
+});
 
     // Onglet par défaut
     document.querySelector('#sidebar-tabs button[data-tab="metar"]').click();
