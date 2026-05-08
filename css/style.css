@@ -422,3 +422,33 @@ h2 {
     opacity: 0.6 !important;
     font-size: 10px !important;
 }
+#sidebar-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+#sidebar-tabs button {
+    background: #1a1f24;
+    color: #00ff9c;
+    border: 1px solid #00ff9c55;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+#sidebar-tabs button.active {
+    background: #00ff9c22;
+    border-color: #00ff9c;
+}
+
+.panel {
+    display: block;
+}
+
+.panel.hidden {
+    display: none;
+}
+
+
