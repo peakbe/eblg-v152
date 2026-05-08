@@ -35,6 +35,15 @@ window.addEventListener("DOMContentLoaded", () => {
             document.getElementById(`panel-${tab}`).classList.remove("hidden");
         });
     });
+    
+    let heatmapEnabled = true;
+
+document.getElementById("btn-heatmap-toggle").addEventListener("click", () => {
+    heatmapEnabled = !heatmapEnabled;
+    toggleHeatmap(heatmapEnabled);
+    document.getElementById("btn-heatmap-toggle").textContent =
+        heatmapEnabled ? "Heatmap ON" : "Heatmap OFF";
+});
 
     // --- Bouton Reset Zoom ---
     document.getElementById("btn-reset-zoom").addEventListener("click", () => {
