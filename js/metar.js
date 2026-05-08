@@ -45,6 +45,7 @@ export function updateMetarUI(data) {
     const windSpeed = metar.wind?.speed_kts ?? null;
 
     const runway = getRunwayFromWind(windDir);
+    window._activeRunway = runway;
     updateRunwayPanel(runway, windDir, windSpeed);
     drawRunway(runway, window.runwayLayer);
     drawCorridor(runway, window.corridorLayer);
