@@ -22,40 +22,23 @@
     <!-- ======================================================
          SIDEBAR
     ====================================================== -->
+   <div id="sidebar">
     <div id="sidebar-tabs">
-    <button data-tab="metar">METAR</button>
-    <button data-tab="taf">TAF</button>
-    <button data-tab="fids">FIDS</button>
-    <button data-tab="sono">Sonomètres</button>
-    <button data-tab="logs">Logs</button>
+        <button data-tab="metar">METAR</button>
+        <button data-tab="taf">TAF</button>
+        <button data-tab="fids">FIDS</button>
+        <button data-tab="sono">Sonomètres</button>
+        <button data-tab="logs">Logs</button>
+    </div>
+
+    <div id="sidebar-panels">
+        <div class="panel" id="panel-metar">…</div>
+        <div class="panel hidden" id="panel-taf">…</div>
+        <div class="panel hidden" id="panel-fids">…</div>
+        <div class="panel hidden" id="panel-sono">…</div>
+        <div class="panel hidden" id="panel-logs">…</div>
+    </div>
 </div>
-
-<div id="sidebar-panels">
-
-    <div class="panel" id="panel-metar">
-        <pre id="metar"></pre>
-        <div id="runway-active"></div>
-    </div>
-
-    <div class="panel hidden" id="panel-taf">
-        <pre id="taf"></pre>
-    </div>
-
-    <div class="panel hidden" id="panel-fids">
-        <div id="fids"></div>
-    </div>
-
-    <div class="panel hidden" id="panel-sono">
-        <div id="sono-list"></div>
-    </div>
-
-    <div class="panel hidden" id="panel-logs">
-        <div id="logs"></div>
-        <div id="logs-live"></div>
-    </div>
-
-</div>
-
 
     <!-- ======================================================
          DETAIL PANEL
