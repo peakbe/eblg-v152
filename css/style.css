@@ -476,4 +476,15 @@ h2 {
     display: none;
 }
 
+.sono-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 8px;
+    color: #00e5ff; /* cockpit IFR cyan */
+    font-size: 14px;
+}
+
+.sono-row span {
+    color: #00e5ff;
+}
 
