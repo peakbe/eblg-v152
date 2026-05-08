@@ -64,25 +64,34 @@ function renderSonometers(list) {
     const heatPoints = [];
 
     list.forEach(sono => {
-        const { lat, lon, status, id, address } = sono;
+    const { lat, lon, status, id, address } = sono;
 
-        if (!lat || !lon) return;
+    if (!lat || !lon) return;
 
-        // Marker
-        const marker = L.marker([lat, lon], { icon: sonoIcon });
+    // Couleur selon statut
+    const color = status === "OK" ? "#00ff9c" : "#ff4444";
 
-        marker.bindPopup(`
-            <b>Sonomètre ${id}</b><br>
-            ${address || "Adresse inconnue"}<br>
-            Statut : ${status || "—"}
-        `);
-
-        markersLayer.addLayer(marker);
-
-        // Heatmap
-        const intensity = status === "OK" ? 0.3 : 0.8;
-        heatPoints.push([lat, lon, intensity]);
+    // Point couleur (circleMarker)
+    const marker = L.circleMarker([lat, lon], {
+        radius: 6,
+        color,
+        fillColor: color,
+        fillOpacity: 0.9,
+        weight: 1
     });
+
+    marker.bindPopup(`
+        <b>Sonomètre ${id}</b><br>
+        ${address || "Adresse inconnue"}<br>
+        Statut : ${status || "—"}
+    `);
+
+    markersLayer.addLayer(marker);
+
+    // Heatmap
+    const intensity = status === "OK" ? 0.3 : 0.8;
+    heatPoints.push([lat, lon, intensity]);
+});
 
     map.addLayer(markersLayer);
 
