@@ -109,6 +109,29 @@ h2 {
     border-color: #00e5ff !important;
 }
 
+#sidebar-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+#sidebar-tabs button {
+    background: #1a1f24;
+    color: #00ff9c;
+    border: 1px solid #00ff9c55;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+#sidebar-tabs button:hover {
+    background: #00ff9c22;
+}
+
+.panel.hidden {
+    display: none;
+}
+
 /* ======================================================
    DETAIL PANEL (RIGHT)
 ====================================================== */
