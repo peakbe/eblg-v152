@@ -224,6 +224,10 @@ function renderSonoList(data) {
     }
 
     data.forEach(s => {
+        const lat = getLat(s);
+        const lng = getLng(s);
+        if (!lat || !lng) return;
+
         const level = getLevel(s);
         const town = getTown(s);
 
@@ -233,17 +237,11 @@ function renderSonoList(data) {
         row.innerHTML = `
             <span class="sono-name">${s.id}</span>
             <span class="sono-town">${town}</span>
-            <span class="sono-level">${
-                level != null ? level + " dB" : "—"
-            }</span>
+            <span class="sono-level">${level != null ? level + " dB" : "—"}</span>
         `;
 
         row.addEventListener("click", () => {
-            const lat = getLat(s);
-            const lng = getLng(s);
-            if (window.map && lat && lng) {
-                window.map.setView([lat, lng], 15);
-            }
+            window.map.setView([lat, lng], 15);
             updateDetailPanel(s);
         });
 
