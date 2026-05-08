@@ -22,44 +22,44 @@
     <!-- ======================================================
          SIDEBAR
     ====================================================== -->
- <div id="sidebar">
+    <div id="sidebar">
 
-    <div id="sidebar-tabs">
-        <button data-tab="metar">METAR</button>
-        <button data-tab="taf">TAF</button>
-        <button data-tab="fids">FIDS</button>
-        <button data-tab="sono">Sonomètres</button>
-        <button data-tab="logs">Logs</button>
-    </div> <!-- ✔ fermeture manquante -->
-
-    <div id="sidebar-panels">
-
-        <div class="panel" id="panel-metar">
-            <pre id="metar"></pre>
-            <div id="runway-active"></div>
+        <div id="sidebar-tabs">
+            <button data-tab="metar">METAR</button>
+            <button data-tab="taf">TAF</button>
+            <button data-tab="fids">FIDS</button>
+            <button data-tab="sono">Sonomètres</button>
+            <button data-tab="logs">Logs</button>
         </div>
 
-        <div class="panel hidden" id="panel-taf">
-            <pre id="taf"></pre>
-        </div>
+        <div id="sidebar-panels">
 
-        <div class="panel hidden" id="panel-fids">
-            <div id="fids-arrivals"></div>
-            <div id="fids-departures"></div>
-        </div>
+            <div class="panel" id="panel-metar">
+                <pre id="metar"></pre>
+                <div id="runway-active"></div>
+            </div>
 
-        <div class="panel hidden" id="panel-sono">
-            <div id="sono-list"></div>
-        </div>
+            <div class="panel hidden" id="panel-taf">
+                <pre id="taf"></pre>
+            </div>
 
-        <div class="panel hidden" id="panel-logs">
-            <div id="logs"></div>
-            <div id="logs-live"></div>
+            <div class="panel hidden" id="panel-fids">
+                <div id="fids-arrivals"></div>
+                <div id="fids-departures"></div>
+            </div>
+
+            <div class="panel hidden" id="panel-sono">
+                <div id="sono-list"></div>
+            </div>
+
+            <div class="panel hidden" id="panel-logs">
+                <div id="logs"></div>
+                <div id="logs-live"></div>
+            </div>
+
         </div>
 
     </div>
-
-</div>
 
     <!-- ======================================================
          DETAIL PANEL
@@ -77,8 +77,6 @@
     ====================================================== -->
     <div id="map"></div>
 
-
-
     <!-- ======================================================
          DEBUG PANEL
     ====================================================== -->
@@ -86,6 +84,13 @@
         <div>FPS : <span id="fps">0</span></div>
         <div>CPU : <span id="cpu">0</span> ms</div>
         <div>Render : <span id="render">0</span> ms</div>
+    </div>
+
+    <!-- ======================================================
+         FLOATING BUTTONS
+    ====================================================== -->
+    <div class="floating-buttons">
+        <button id="btn-reset-zoom" class="float-btn">Reset Zoom</button>
     </div>
 
     <!-- ======================================================
@@ -118,17 +123,13 @@
     <script type="module" src="js/fids.js"></script>
     <script type="module" src="js/sonometers.js"></script>
 
+    <!-- Status & logs -->
     <script type="module" src="js/status.js"></script>
     <script type="module" src="js/logs.js"></script>
     <script type="module" src="js/logsLive.js"></script>
 
     <!-- App (doit être chargé en dernier) -->
     <script type="module" src="js/app.js"></script>
-      
-<div class="floating-buttons">
-    <button id="btn-reset-zoom" class="float-btn">Reset Zoom</button>
-</div>
-
 
 </body>
 </html>
