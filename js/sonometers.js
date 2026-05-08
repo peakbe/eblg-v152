@@ -1,11 +1,13 @@
 // ======================================================
-// SONOMETERS PRO+++ — Cockpit IFR EBLG
+// SONOMETERS PRO++++ — Cockpit IFR EBLG
 // ======================================================
 // - Couleurs ATC selon niveau sonore
-// - Tri par distance de la piste active
+// - Tri dynamique (distance / ID / adresse)
+// - Filtre par commune
 // - Icônes cockpit IFR
 // - Heatmap dynamique (vert → rouge)
-// - Popup enrichi (niveau, commune, statut)
+// - Popup enrichi
+// - Highlight carte <-> liste
 // - Compatible backend EBLG (lat, lon, address)
 // ======================================================
 
@@ -23,6 +25,11 @@ const REF_LNG = 5.443;
 let sonoMarkers = null;
 let sonoHeat = null;
 let sonoDataCache = [];
+let markerById = new Map();
+let rowById = new Map();
+
+let currentSort = "distance";
+let currentTownFilter = "all";
 
 // ------------------------------------------------------
 // Utils
@@ -40,7 +47,18 @@ function getLevel(s) {
 }
 
 function getTown(s) {
-    return s.town || s.commune || s.city || "—";
+    // On dérive la commune depuis l'adresse si pas de champ dédié
+    if (s.town) return s.town;
+    if (s.commune) return s.commune;
+    if (s.city) return s.city;
+    if (s.address) {
+        // ex: "Rue de la Pommeraie, 4690 Wonck, Belgique"
+        const parts = s.address.split(",");
+        if (parts.length >= 2) {
+            return parts[1].trim();
+        }
+    }
+    return "—";
 }
 
 function getStatus(s) {
@@ -105,29 +123,84 @@ export async function loadSonometers() {
             return;
         }
 
-        // Ajout distance piste + tri
-        sonoDataCache = data
-            .map(s => {
-                const lat = getLat(s);
-                const lng = getLng(s);
-                const dist = (lat && lng)
-                    ? distanceKm(lat, lng, REF_LAT, REF_LNG)
-                    : null;
-                return { ...s, _distanceKm: dist };
-            })
-            .sort((a, b) => {
-                if (a._distanceKm == null) return 1;
-                if (b._distanceKm == null) return -1;
-                return a._distanceKm - b._distanceKm;
-            });
+        // Ajout distance piste
+        sonoDataCache = data.map(s => {
+            const lat = getLat(s);
+            const lng = getLng(s);
+            const dist = (lat && lng)
+                ? distanceKm(lat, lng, REF_LAT, REF_LNG)
+                : null;
+            return { ...s, _distanceKm: dist };
+        });
 
+        initSonoControls(sonoDataCache);
         renderSonometers(sonoDataCache);
-        renderSonoList(sonoDataCache);
+        updateSonoListView();
 
         log("Sonomètres chargés :", sonoDataCache.length);
     } catch (err) {
         logErr("Erreur chargement sonomètres :", err);
     }
+}
+
+// ------------------------------------------------------
+// Contrôles (tri + filtre)
+// ------------------------------------------------------
+function initSonoControls(data) {
+    const sortEl = document.getElementById("sono-sort");
+    const filterEl = document.getElementById("sono-filter-town");
+    if (!sortEl || !filterEl) return;
+
+    // Peupler filtre communes
+    const towns = new Set();
+    data.forEach(s => {
+        const t = getTown(s);
+        if (t && t !== "—") towns.add(t);
+    });
+
+    // Reset options (sauf "all")
+    filterEl.innerHTML = `<option value="all">Commune: Toutes</option>`;
+    Array.from(towns).sort().forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        filterEl.appendChild(opt);
+    });
+
+    sortEl.onchange = () => {
+        currentSort = sortEl.value;
+        updateSonoListView();
+    };
+
+    filterEl.onchange = () => {
+        currentTownFilter = filterEl.value;
+        updateSonoListView();
+    };
+}
+
+function updateSonoListView() {
+    let list = [...sonoDataCache];
+
+    // Filtre commune
+    if (currentTownFilter !== "all") {
+        list = list.filter(s => getTown(s) === currentTownFilter);
+    }
+
+    // Tri
+    list.sort((a, b) => {
+        if (currentSort === "id") {
+            return String(a.id).localeCompare(String(b.id));
+        }
+        if (currentSort === "address") {
+            return String(a.address || "").localeCompare(String(b.address || ""));
+        }
+        // distance par défaut
+        const da = a._distanceKm ?? Infinity;
+        const db = b._distanceKm ?? Infinity;
+        return da - db;
+    });
+
+    renderSonoList(list);
 }
 
 // ------------------------------------------------------
@@ -149,6 +222,7 @@ function renderSonometers(data) {
     });
 
     const heatPoints = [];
+    markerById.clear();
 
     data.forEach(s => {
         const lat = getLat(s);
@@ -174,8 +248,11 @@ function renderSonometers(data) {
             }
         `);
 
+        marker.on("mouseover", () => highlightRow(s.id, true));
+        marker.on("mouseout", () => highlightRow(s.id, false));
         marker.on("click", () => updateDetailPanel(s));
 
+        markerById.set(s.id, marker);
         sonoMarkers.addLayer(marker);
 
         heatPoints.push([lat, lng, levelIntensity(level)]);
@@ -210,13 +287,14 @@ export function toggleHeatmap(enabled) {
 }
 
 // ------------------------------------------------------
-// Liste latérale triée par distance
+// Liste latérale triée / filtrée
 // ------------------------------------------------------
 function renderSonoList(data) {
     const el = document.getElementById("sono-list");
     if (!el) return;
 
     el.innerHTML = "";
+    rowById.clear();
 
     if (!data.length) {
         el.innerHTML = `<div class="sono-row">Aucun sonomètre disponible</div>`;
@@ -236,17 +314,42 @@ function renderSonoList(data) {
 
         row.innerHTML = `
             <span class="sono-name">${s.id}</span>
-            <span class="sono-town">${s.address || "—"}</span>
+            <span class="sono-town">${s.address || town}</span>
             <span class="sono-level">${level != null ? level + " dB" : "—"}</span>
         `;
 
+        row.addEventListener("mouseenter", () => {
+            highlightRow(s.id, true);
+            const marker = markerById.get(s.id);
+            if (marker) {
+                marker.openPopup();
+            }
+        });
+
+        row.addEventListener("mouseleave", () => {
+            highlightRow(s.id, false);
+        });
+
         row.addEventListener("click", () => {
-            window.map.setView([lat, lng], 15);
+            if (window.map && lat && lng) {
+                window.map.setView([lat, lng], 15);
+            }
             updateDetailPanel(s);
         });
 
+        rowById.set(s.id, row);
         el.appendChild(row);
     });
+}
+
+// ------------------------------------------------------
+// Highlight carte <-> liste
+// ------------------------------------------------------
+function highlightRow(id, on) {
+    const row = rowById.get(id);
+    if (!row) return;
+    if (on) row.classList.add("highlight");
+    else row.classList.remove("highlight");
 }
 
 // ------------------------------------------------------
