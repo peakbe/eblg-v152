@@ -1,69 +1,73 @@
-// public/js/runways.js
+// ======================================================
+// RUNWAYS PRO+++ — Cockpit IFR EBLG
+// ======================================================
+// - Détection piste active (04/22)
+// - Calcul crosswind / headwind
+// - Mise à jour panneau piste
+// - Coordonnées réelles EBLG
+// ======================================================
 
+// Coordonnées réelles EBLG
 export const RUNWAYS = {
-    "22": {
-        id: "22",
-        heading: 220,
-        start: [50.64834, 5.46639],
-        end:   [50.64186, 5.44028]
-    },
     "04": {
         id: "04",
         heading: 40,
-        start: [50.64186, 5.44028],
-        end:   [50.64834, 5.46639]
+        start: [50.63302, 5.46163],   // seuil 22
+        end:   [50.64594, 5.44321]    // seuil 04
+    },
+    "22": {
+        id: "22",
+        heading: 220,
+        start: [50.64594, 5.44321],   // seuil 04
+        end:   [50.63302, 5.46163]    // seuil 22
     }
 };
 
+// ------------------------------------------------------
+// Détermination piste active selon direction du vent
+// ------------------------------------------------------
 export function getRunwayFromWind(windDir) {
-    if (windDir == null) return "22";
+    if (windDir == null) return RUNWAYS["22"]; // défaut
+
     const d22 = Math.abs(windDir - RUNWAYS["22"].heading);
     const d04 = Math.abs(windDir - RUNWAYS["04"].heading);
+
     const n22 = Math.min(d22, 360 - d22);
     const n04 = Math.min(d04, 360 - d04);
-    return n22 < n04 ? "22" : "04";
+
+    return n22 < n04 ? RUNWAYS["22"] : RUNWAYS["04"];
 }
 
-export function drawRunway(runwayId, layer) {
-    if (!layer || !window.L) return;
-    layer.clearLayers();
+// ------------------------------------------------------
+// Calcul vent de travers / vent de face
+// ------------------------------------------------------
+export function computeCrosswind(windDir, windSpeed, runwayHeading) {
+    if (windDir == null || windSpeed == null || runwayHeading == null) {
+        return { crosswind: 0, headwind: 0 };
+    }
 
-    const rw = RUNWAYS[runwayId];
-    if (!rw) return;
+    const angle = (windDir - runwayHeading) * Math.PI / 180;
 
-    window.L.polyline([rw.start, rw.end], {
-        color: "#00ff9c",
-        weight: 4
-    }).addTo(layer);
+    const crosswind = Math.sin(angle) * windSpeed;
+    const headwind  = Math.cos(angle) * windSpeed;
+
+    return {
+        crosswind: Math.abs(crosswind),
+        headwind
+    };
 }
 
-export function drawCorridor(runwayId, layer) {
-    if (!layer || !window.L) return;
-    layer.clearLayers();
-
-    const rw = RUNWAYS[runwayId];
-    if (!rw) return;
-
-    const offset = 0.01;
-    const p1 = [rw.start[0] + offset, rw.start[1] - offset];
-    const p2 = [rw.end[0] + offset, rw.end[1] - offset];
-    const p3 = [rw.end[0] - offset, rw.end[1] + offset];
-    const p4 = [rw.start[0] - offset, rw.start[1] + offset];
-
-    window.L.polygon([p1, p2, p3, p4], {
-        color: "#00ff9c",
-        weight: 1,
-        fillColor: "#00ff9c",
-        fillOpacity: 0.1
-    }).addTo(layer);
-}
-
-export function updateRunwayPanel(runway, windDir, windSpeed, crosswind = 0) {
+// ------------------------------------------------------
+// Mise à jour panneau piste
+// ------------------------------------------------------
+export function updateRunwayPanel(runway, windDir, windSpeed, crosswind = 0, headwind = 0) {
     const el = document.getElementById("runway-active");
     if (!el) return;
+
     el.innerHTML = `
         <b>Piste active :</b> ${runway}<br>
         Vent : ${windDir ?? "—"}° / ${windSpeed ?? "—"} kt<br>
-        Crosswind : ${crosswind.toFixed(1)} kt
+        Crosswind : ${crosswind.toFixed(1)} kt<br>
+        Headwind : ${headwind.toFixed(1)} kt
     `;
 }
