@@ -562,3 +562,34 @@ h2 {
 .runway-label {
     pointer-events: none;
 }
+
+.rwy-box {
+    padding: 4px 10px;
+    border: 1px solid #00e5ff;
+    color: #00e5ff;
+    font-weight: 600;
+    font-size: 14px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.45);
+    text-shadow: 0 0 6px #000;
+    margin-left: auto;
+    user-select: none;
+}
+
+/* RWY 04 = vert ATC */
+.rwy-04 {
+    border-color: #00e676;
+    color: #00e676;
+}
+
+/* RWY 22 = bleu ATC */
+.rwy-22 {
+    border-color: #2979ff;
+    color: #2979ff;
+}
+
+/* RWY inconnue */
+.rwy-null {
+    border-color: #888;
+    color: #888;
+}
