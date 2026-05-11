@@ -41,6 +41,7 @@ export function updateMetarUI(data) {
     if (!data || !data.raw) {
         el.innerText = "METAR indisponible";
         window._activeRunway = null;
+        updateRunwayIndicator(window._activeRunway);
         drawRunwayDirection(null);
         updateRunwayPanel("—", null, null, 0, 0);
         return;
