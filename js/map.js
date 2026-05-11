@@ -1,17 +1,12 @@
 // ======================================================
-// RUNWAY DIRECTION — Cockpit IFR EBLG
+// MAP PRO+++ — Cockpit IFR EBLG
 // ======================================================
 
 import { RUNWAYS } from "./runways.js";
 
-let runwayLine = null;
-let runwayArrow = null;
-let runwayLabel = null;
-
-// ======================================================
-// MAP INIT — Cockpit IFR EBLG
-// ======================================================
-
+// ------------------------------------------------------
+// INIT MAP
+// ------------------------------------------------------
 export function initMap() {
     if (!window.L) {
         console.error("[MAP] Leaflet non chargé");
@@ -25,7 +20,7 @@ export function initMap() {
     }
 
     const map = window.L.map("map", {
-        center: [50.645, 5.46],   // centre EBLG
+        center: [50.645, 5.46],   // Centre EBLG
         zoom: 12,
         zoomControl: true
     });
@@ -40,6 +35,13 @@ export function initMap() {
     console.log("[MAP] Carte initialisée");
 }
 
+// ======================================================
+// RUNWAY DIRECTION — Cockpit IFR EBLG
+// ======================================================
+
+let runwayLine = null;
+let runwayArrow = null;
+let runwayLabel = null;
 
 export function drawRunwayDirection(runwayId) {
     if (!window.map) return;
@@ -91,6 +93,7 @@ export function drawRunwayDirection(runwayId) {
         })
     }).addTo(window.map);
 }
+
 // ======================================================
 // CORRIDOR BRUIT PRO+++ — Cockpit IFR
 // ======================================================
@@ -100,7 +103,6 @@ let noiseCorridor = null;
 export function drawNoiseCorridor(runwayId) {
     if (!window.map) return;
 
-    // Nettoyage
     if (noiseCorridor) {
         window.map.removeLayer(noiseCorridor);
         noiseCorridor = null;
@@ -110,14 +112,11 @@ export function drawNoiseCorridor(runwayId) {
 
     const rw = RUNWAYS[runwayId];
 
-    // Axe piste : start → end
     const A = rw.start;
     const B = rw.end;
 
-    // Largeur corridor (en mètres)
     const width = 800; // 800 m de chaque côté
 
-    // Fonction pour décaler un point perpendiculairement
     function offsetPoint(lat, lng, dx, dy) {
         const R = 6378137;
         const newLat = lat + (dy / R) * (180 / Math.PI);
@@ -125,22 +124,18 @@ export function drawNoiseCorridor(runwayId) {
         return [newLat, newLng];
     }
 
-    // Calcul vecteur piste
     const dx = B[1] - A[1];
     const dy = B[0] - A[0];
 
-    // Normalisation
     const len = Math.sqrt(dx*dx + dy*dy);
-    const nx = -dy / len; // vecteur perpendiculaire
+    const nx = -dy / len;
     const ny = dx / len;
 
-    // Décalage corridor
     const A_left  = offsetPoint(A[0], A[1],  nx * width, ny * width);
     const A_right = offsetPoint(A[0], A[1], -nx * width, -ny * width);
     const B_left  = offsetPoint(B[0], B[1],  nx * width, ny * width);
     const B_right = offsetPoint(B[0], B[1], -nx * width, -ny * width);
 
-    // Couleur cockpit IFR
     const color = runwayId === "04" ? "#00e676" : "#2979ff";
 
     noiseCorridor = window.L.polygon(
