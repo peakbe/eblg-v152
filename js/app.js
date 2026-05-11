@@ -2,8 +2,6 @@
 // APP.JS PRO+ (VERSION HARMONISÉE)
 // =========================
 
-import { initMap, resetMapView } from "./map.js";
-
 import { safeLoadMetar } from "./metar.js";
 import { safeLoadTaf } from "./taf.js";
 import { safeLoadFids } from "./fids.js";
