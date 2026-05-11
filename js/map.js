@@ -1,102 +1,52 @@
-// public/js/map.js
-
-import { RUNWAYS, drawRunway, drawCorridor } from "./runways.js";
-
-export function initMap() {
-    if (!window.L) {
-        console.error("[MAP] Leaflet non chargé");
-        return;
-    }
-
-    const mapEl = document.getElementById("map");
-    if (!mapEl) {
-        console.error("[MAP] #map introuvable");
-        return;
-    }
-
-    // Initialisation carte
-    const map = window.L.map("map", {
-        center: [50.645, 5.46],
-        zoom: 12,
-        zoomControl: true
-    });
-
-    // *** CRITIQUE ***
-    window.map = map;   // ← tu avais window._map, mais ton app utilise window.map
-
-    // Fond OSM
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 18,
-        attribution: "&copy; OpenStreetMap"
-    }).addTo(map);
-
-    // Couches globales
-    window.runwayLayer = window.L.layerGroup().addTo(map);
-    window.corridorLayer = window.L.layerGroup().addTo(map);
-
-    // Piste par défaut
-    drawRunway("22", window.runwayLayer);
-    drawCorridor("22", window.corridorLayer);
-
-    console.log("[MAP] Carte initialisée");
-}
 // ======================================================
-// RUNWAY PRO++ — Direction décollage / atterrissage
+// RUNWAY DIRECTION — Cockpit IFR EBLG
 // ======================================================
 
-const RWY04 = [50.64594, 5.44321];
-const RWY22 = [50.63302, 5.46163];
+import { RUNWAYS } from "./runways.js";
 
-let runwayLayer = null;
+let runwayLine = null;
 let runwayArrow = null;
+let runwayLabel = null;
 
-export function drawRunwayDirection(active) {
+export function drawRunwayDirection(runwayId) {
     if (!window.map) return;
 
-    // Nettoyage
-    if (runwayLayer) window.map.removeLayer(runwayLayer);
+    if (runwayLine) window.map.removeLayer(runwayLine);
     if (runwayArrow) window.map.removeLayer(runwayArrow);
+    if (runwayLabel) window.map.removeLayer(runwayLabel);
 
-    let start, end, color, label;
+    if (!runwayId || !RUNWAYS[runwayId]) return;
 
-    if (active === "04") {
-        start = RWY22;
-        end = RWY04;
-        color = "#00e676"; // vert = départ
-        label = "RWY 04 → NE";
-    } else if (active === "22") {
-        start = RWY04;
-        end = RWY22;
-        color = "#2979ff"; // bleu = arrivée
-        label = "RWY 22 → SW";
-    } else {
-        return;
-    }
+    const rw = RUNWAYS[runwayId];
+    const start = rw.start;
+    const end = rw.end;
 
-    // Ligne de piste
-    runwayLayer = window.L.polyline([start, end], {
+    const color = runwayId === "04" ? "#00e676" : "#2979ff";
+    const labelText = runwayId === "04" ? "RWY 04 → NE" : "RWY 22 → SW";
+
+    runwayLine = window.L.polyline([start, end], {
         color,
         weight: 4,
         opacity: 0.9
     }).addTo(window.map);
 
-    // Flèche directionnelle
-    runwayArrow = window.L.polylineDecorator(runwayLayer, {
-        patterns: [
-            {
-                offset: "50%",
-                repeat: 0,
-                symbol: window.L.Symbol.arrowHead({
-                    pixelSize: 18,
-                    polygon: false,
-                    pathOptions: { stroke: true, color }
-                })
-            }
-        ]
-    }).addTo(window.map);
+    if (window.L.polylineDecorator) {
+        runwayArrow = window.L.polylineDecorator(runwayLine, {
+            patterns: [
+                {
+                    offset: "50%",
+                    repeat: 0,
+                    symbol: window.L.Symbol.arrowHead({
+                        pixelSize: 18,
+                        polygon: false,
+                        pathOptions: { stroke: true, color }
+                    })
+                }
+            ]
+        }).addTo(window.map);
+    }
 
-    // Label
-    window.L.marker(end, {
+    runwayLabel = window.L.marker(end, {
         icon: window.L.divIcon({
             className: "runway-label",
             html: `<div style="
@@ -104,15 +54,7 @@ export function drawRunwayDirection(active) {
                 font-size:14px;
                 font-weight:600;
                 text-shadow:0 0 4px black;
-            ">${label}</div>`
+            ">${labelText}</div>`
         })
     }).addTo(window.map);
-}
-
-// ------------------------------------------------------
-// RESET ZOOM (doit être en DEHORS de initMap)
-// ------------------------------------------------------
-export function resetMapView() {
-    if (!window.map) return;
-    window.map.setView([50.637, 5.443], 13);
 }
