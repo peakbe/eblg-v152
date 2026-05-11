@@ -51,6 +51,6 @@ export function updateMetarUI(data) {
     updateRunwayPanel(runway, windDir, windSpeed);
     drawRunway(runway, window.runwayLayer);
     drawCorridor(runway, window.corridorLayer);
-    drawRunwayDirection(activeRunway);
+    drawRunwayDirection(window._activeRunway);
 
 }
