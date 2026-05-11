@@ -13,6 +13,7 @@ import {
 import { drawRunwayDirection } from "./map.js";
 import { applyRunwayColoring } from "./sonometers.js";
 applyRunwayColoring(active?.id ?? null);
+import { drawNoiseCorridor } from "./map.js";
 
 const IS_DEV = location.hostname.includes("localhost");
 const log = (...a) => IS_DEV && console.log("[METAR]", ...a);
@@ -47,6 +48,7 @@ export function updateMetarUI(data) {
         drawRunwayDirection(null);
         updateRunwayPanel("—", null, null, 0, 0);
         return;
+        drawNoiseCorridor(active?.id ?? null);
     }
 
     el.innerText = data.raw;
