@@ -11,7 +11,9 @@ import { ENDPOINTS } from "./config.js";
 import { fetchJSON, updateStatusPanel } from "./helpers.js";
 import { getRunwayFromWind, computeCrosswind } from "./runways.js";
 import { drawRunwayDirection, drawNoiseCorridor } from "./map.js";
+import { drawWindVector, drawTracks } from "./map.js";
 import { applyRunwayColoring } from "./sonometers.js";
+
 
 const IS_DEV = location.hostname.includes("localhost");
 const log = (...a) => IS_DEV && console.log("[METAR]", ...a);
@@ -63,7 +65,10 @@ export function updateMetarUI(data) {
         updateRunwayIndicator(null);
         drawRunwayDirection(null);
         drawNoiseCorridor(null);
+        drawWindVector(windDir, windSpeed);
+        drawTracks(active?.id ?? null);
         updateRunwayPanel("—", null, null, 0, 0);
+        
         return;
     }
 
