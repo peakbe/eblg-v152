@@ -1,387 +1,134 @@
 // ======================================================
-// SONOMETERS PRO++++ — Cockpit IFR EBLG
+// SONOMETERS PRO+++ — Cockpit IFR EBLG
+// - Chargement dynamique backend
+// - Icônes ATC
+// - Clustering
+// - Heatmap bruit dynamique
+// - Recoloration selon piste active
+// - Panneau détail
 // ======================================================
 
 import { ENDPOINTS } from "./config.js";
 import { fetchJSON } from "./helpers.js";
+import { updateNoiseHeatmap } from "./map.js";
 
-const IS_DEV = location.hostname.includes("localhost");
-const log = (...a) => IS_DEV && console.log("[SONO]", ...a);
-const logErr = (...a) => console.error("[SONO ERROR]", ...a);
+let markersLayer = null;
+let clusterLayer = null;
+let activeRunway = null;
 
-// Référence piste EBLG (seuil 22)
-const REF_LAT = 50.637;
-const REF_LNG = 5.443;
+// ------------------------------------------------------
+// Icônes ATC PRO
+// ------------------------------------------------------
+const iconGreen = window.L.icon({
+    iconUrl: "./assets/sonometer_green.png",
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+});
 
-let sonoMarkers = null;
-let sonoHeat = null;
-let sonoDataCache = [];
-let markerById = new Map();
-let rowById = new Map();
+const iconRed = window.L.icon({
+    iconUrl: "./assets/sonometer_red.png",
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+});
 
-let currentSort = "distance";
-let currentTownFilter = "all";
+const iconBlue = window.L.icon({
+    iconUrl: "./assets/sonometer_blue.png",
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+});
 
-// ======================================================
-// COUPLAGE PISTE ACTIVE → SONOMÈTRES (rouge/vert)
-// ======================================================
-
-const RWY_SECTORS = {
-    "22": {
-        green: ["F002","F003","F004","F005","F006","F007","F008","F009","F010","F011","F012","F013","F016"],
-        red:   ["F001","F014","F015","F017"]
-    },
-    "04": {
-        green: ["F002","F003","F007","F008","F009","F011","F013","F014","F015"],
-        red:   ["F004","F005","F006","F010","F012","F016","F001","F017"]
+// ------------------------------------------------------
+// Chargement sécurisé
+// ------------------------------------------------------
+export async function safeLoadSonometers() {
+    try {
+        await loadSonometers();
+    } catch (e) {
+        console.error("[SONO] Erreur :", e);
     }
-};
-
-export function applyRunwayColoring(activeRunway) {
-    if (!activeRunway || !RWY_SECTORS[activeRunway]) return;
-
-    const greenSet = new Set(RWY_SECTORS[activeRunway].green);
-    const redSet   = new Set(RWY_SECTORS[activeRunway].red);
-
-    markerById.forEach((marker, id) => {
-        let color = "#00e5ff";
-
-        if (greenSet.has(id)) color = "#00e676";
-        if (redSet.has(id))   color = "#f44336";
-
-        marker.setIcon(window.L.divIcon({
-            className: "sono-icon",
-            html: `<div style="
-                width:10px;
-                height:10px;
-                border-radius:50%;
-                background:${color};
-                box-shadow:0 0 6px ${color};
-            "></div>`,
-            iconSize: [10, 10]
-        }));
-    });
-
-    rowById.forEach((row, id) => {
-        row.style.color =
-            greenSet.has(id) ? "#00e676" :
-            redSet.has(id)   ? "#f44336" :
-                               "#00e5ff";
-    });
 }
 
 // ------------------------------------------------------
-// Utils
-// ------------------------------------------------------
-function getLat(s) { return s.lat ?? s.latitude ?? null; }
-function getLng(s) { return s.lng ?? s.lon ?? s.longitude ?? null; }
-function getLevel(s) { return typeof s.level === "number" ? s.level : null; }
-
-function getTown(s) {
-    if (s.town) return s.town;
-    if (s.commune) return s.commune;
-    if (s.city) return s.city;
-    if (s.address) {
-        const parts = s.address.split(",");
-        if (parts.length >= 2) return parts[1].trim();
-    }
-    return "—";
-}
-
-function getStatus(s) { return s.status || "Actif"; }
-
-function distanceKm(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const toRad = d => d * Math.PI / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function levelColor(level) {
-    if (level == null) return "#00e5ff";
-    if (level < 45) return "#00e676";
-    if (level < 55) return "#ffeb3b";
-    if (level < 65) return "#ff9800";
-    return "#f44336";
-}
-
-function levelIntensity(level) {
-    if (level == null) return 0.3;
-    const min = 40, max = 80;
-    const clamped = Math.max(min, Math.min(max, level));
-    return (clamped - min) / (max - min) * 0.8 + 0.2;
-}
-
-function sonoIcon(level) {
-    const color = levelColor(level);
-    return window.L.divIcon({
-        className: "sono-icon",
-        html: `<div style="
-            width:10px;
-            height:10px;
-            border-radius:50%;
-            background:${color};
-            box-shadow:0 0 6px ${color};
-        "></div>`,
-        iconSize: [10, 10]
-    });
-}
-
-// ------------------------------------------------------
-// Chargement principal
+// Chargement backend
 // ------------------------------------------------------
 export async function loadSonometers() {
-    try {
-        const data = await fetchJSON(ENDPOINTS.sonometers);
+    const data = await fetchJSON(ENDPOINTS.sonometers);
 
-        if (!Array.isArray(data)) {
-            logErr("Format sonomètres invalide :", data);
-            return;
-        }
-
-        sonoDataCache = data.map(s => {
-            const lat = getLat(s);
-            const lng = getLng(s);
-            const dist = (lat && lng)
-                ? distanceKm(lat, lng, REF_LAT, REF_LNG)
-                : null;
-            return { ...s, _distanceKm: dist };
-        });
-
-        initSonoControls(sonoDataCache);
-        renderSonometers(sonoDataCache);
-        updateSonoListView();
-
-        log("Sonomètres chargés :", sonoDataCache.length);
-    } catch (err) {
-        logErr("Erreur chargement sonomètres :", err);
-    }
+    updateSonometersUI(data);
+    updateNoiseHeatmap(data); // ← Heatmap dynamique PRO+++
 }
 
 // ------------------------------------------------------
-// Contrôles (tri + filtre)
+// Mise à jour UI
 // ------------------------------------------------------
-function initSonoControls(data) {
-    const sortEl = document.getElementById("sono-sort");
-    const filterEl = document.getElementById("sono-filter-town");
-    if (!sortEl || !filterEl) return;
+export function updateSonometersUI(data) {
+    if (!window.map) return;
 
-    const towns = new Set();
-    data.forEach(s => {
-        const t = getTown(s);
-        if (t && t !== "—") towns.add(t);
-    });
-
-    filterEl.innerHTML = `<option value="all">Commune: Toutes</option>`;
-    Array.from(towns).sort().forEach(t => {
-        const opt = document.createElement("option");
-        opt.value = t;
-        opt.textContent = t;
-        filterEl.appendChild(opt);
-    });
-
-    sortEl.onchange = () => {
-        currentSort = sortEl.value;
-        updateSonoListView();
-    };
-
-    filterEl.onchange = () => {
-        currentTownFilter = filterEl.value;
-        updateSonoListView();
-    };
-}
-
-function updateSonoListView() {
-    let list = [...sonoDataCache];
-
-    if (currentTownFilter !== "all") {
-        list = list.filter(s => getTown(s) === currentTownFilter);
-    }
-
-    list.sort((a, b) => {
-        if (currentSort === "id") {
-            return String(a.id).localeCompare(String(b.id));
-        }
-        if (currentSort === "address") {
-            return String(a.address || "").localeCompare(String(b.address || ""));
-        }
-        const da = a._distanceKm ?? Infinity;
-        const db = b._distanceKm ?? Infinity;
-        return da - db;
-    });
-
-    renderSonoList(list);
-}
-
-// ------------------------------------------------------
-// Rendu carte
-// ------------------------------------------------------
-function renderSonometers(data) {
-    if (!window.map) {
-        logErr("Carte non initialisée");
-        return;
-    }
-
-    if (sonoMarkers) window.map.removeLayer(sonoMarkers);
-    if (sonoHeat) window.map.removeLayer(sonoHeat);
-
-    sonoMarkers = window.L.markerClusterGroup({
+    if (clusterLayer) window.map.removeLayer(clusterLayer);
+    clusterLayer = window.L.markerClusterGroup({
         disableClusteringAtZoom: 15,
-        spiderfyOnMaxZoom: true,
-        showCoverageOnHover: false
+        spiderfyOnMaxZoom: false
     });
 
-    const heatPoints = [];
-    markerById.clear();
+    if (!Array.isArray(data)) return;
 
     data.forEach(s => {
-        const lat = getLat(s);
-        const lng = getLng(s);
-        if (!lat || !lng) return;
+        const lat = s.lat;
+        const lon = s.lon;
+        const lvl = s.level ?? 40;
 
-        const level = getLevel(s);
-        const town = getTown(s);
-        const status = getStatus(s);
+        if (!lat || !lon) return;
 
-        const marker = window.L.marker([lat, lng], {
-            icon: sonoIcon(level)
-        });
+        const icon = lvl >= 55 ? iconRed : lvl >= 45 ? iconBlue : iconGreen;
 
-        marker.bindPopup(`
-            <b>Sonomètre ${s.id}</b><br>
-            Adresse : ${s.address || "—"}<br>
-            Niveau : ${level != null ? level + " dB" : "—"}<br>
-            Commune : ${town}<br>
-            Statut : ${status}<br>
-            Distance piste : ${
-                s._distanceKm != null ? s._distanceKm.toFixed(1) + " km" : "—"
-            }
+        const marker = window.L.marker([lat, lon], { icon });
+
+        marker.bindTooltip(`
+            <b>${s.name || "Sonomètre"}</b><br>
+            Niveau : ${lvl} dB<br>
+            ${s.desc || ""}
         `);
 
-        marker.on("mouseover", () => highlightRow(s.id, true));
-        marker.on("mouseout", () => highlightRow(s.id, false));
-        marker.on("click", () => updateDetailPanel(s));
+        marker.on("click", () => openSonometerPanel(s));
 
-        markerById.set(s.id, marker);
-        sonoMarkers.addLayer(marker);
-
-        heatPoints.push([lat, lng, levelIntensity(level)]);
+        clusterLayer.addLayer(marker);
     });
 
-    sonoHeat = window.L.heatLayer(heatPoints, {
-        radius: 25,
-        blur: 18,
-        maxZoom: 17,
-        gradient: {
-            0.2: "#00e676",
-            0.5: "#ffeb3b",
-            0.8: "#ff9800",
-            1.0: "#f44336"
-        }
-    });
-
-    sonoMarkers.addTo(window.map);
-    sonoHeat.addTo(window.map);
+    window.map.addLayer(clusterLayer);
 }
 
 // ------------------------------------------------------
-// Toggle Heatmap
+// Recoloration selon piste active
 // ------------------------------------------------------
-export function toggleHeatmap(enabled) {
-    if (!window.map || !sonoHeat) return;
-    if (enabled) {
-        if (!window.map.hasLayer(sonoHeat)) sonoHeat.addTo(window.map);
-    } else {
-        if (window.map.hasLayer(sonoHeat)) window.map.removeLayer(sonoHeat);
-    }
+export function applyRunwayColoring(rwy) {
+    activeRunway = rwy;
+
+    if (!clusterLayer) return;
+
+    clusterLayer.eachLayer(marker => {
+        const lvl = marker.options?.data?.level ?? 40;
+
+        let icon = iconGreen;
+        if (lvl >= 55) icon = iconRed;
+        else if (lvl >= 45) icon = iconBlue;
+
+        marker.setIcon(icon);
+    });
 }
 
 // ------------------------------------------------------
-// Liste latérale
+// Panneau détail
 // ------------------------------------------------------
-function renderSonoList(data) {
-    const el = document.getElementById("sono-list");
+function openSonometerPanel(s) {
+    const el = document.getElementById("sonometer-panel");
     if (!el) return;
 
-    el.innerHTML = "";
-    rowById.clear();
+    el.innerHTML = `
+        <div class="sono-title">${s.name || "Sonomètre"}</div>
+        <div><b>Niveau :</b> ${s.level ?? "—"} dB</div>
+        <div><b>Coordonnées :</b> ${s.lat}, ${s.lon}</div>
+        <div><b>Description :</b> ${s.desc || "—"}</div>
+    `;
 
-    if (!data.length) {
-        el.innerHTML = `<div class="sono-row">Aucun sonomètre disponible</div>`;
-        return;
-    }
-
-    data.forEach(s => {
-        const lat = getLat(s);
-        const lng = getLng(s);
-        if (!lat || !lng) return;
-
-        const level = getLevel(s);
-        const town = getTown(s);
-
-        const row = document.createElement("div");
-        row.className = "sono-row";
-
-        row.innerHTML = `
-            <span class="sono-name">${s.id}</span>
-            <span class="sono-town">${s.address || town}</span>
-            <span class="sono-level">${level != null ? level + " dB" : "—"}</span>
-        `;
-
-        row.addEventListener("mouseenter", () => {
-            highlightRow(s.id, true);
-            const marker = markerById.get(s.id);
-            if (marker) marker.openPopup();
-        });
-
-        row.addEventListener("mouseleave", () => {
-            highlightRow(s.id, false);
-        });
-
-        row.addEventListener("click", () => {
-            if (window.map && lat && lng) {
-                window.map.setView([lat, lng], 15);
-            }
-            updateDetailPanel(s);
-        });
-
-        rowById.set(s.id, row);
-        el.appendChild(row);
-    });
-}
-
-// ------------------------------------------------------
-// Highlight carte <-> liste
-// ------------------------------------------------------
-function highlightRow(id, on) {
-    const row = rowById.get(id);
-    if (!row) return;
-    if (on) row.classList.add("highlight");
-    else row.classList.remove("highlight");
-}
-
-// ------------------------------------------------------
-// Détail panel
-// ------------------------------------------------------
-function updateDetailPanel(s) {
-    const panel = document.getElementById("detail-panel");
-    if (!panel) return;
-
-    const level = getLevel(s);
-    const town = getTown(s);
-    const status = getStatus(s);
-
-    document.getElementById("detail-title").textContent = `Sonomètre ${s.id}`;
-    document.getElementById("detail-address").textContent = s.address || "—";
-    document.getElementById("detail-town").textContent = town;
-    document.getElementById("detail-status").textContent = status;
-    document.getElementById("detail-distance").textContent =
-        s._distanceKm != null ? s._distanceKm.toFixed(1) + " km" : "—";
-
-    panel.classList.remove("hidden");
+    el.classList.add("open");
 }
