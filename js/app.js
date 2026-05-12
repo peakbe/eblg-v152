@@ -34,7 +34,8 @@ window.addEventListener("DOMContentLoaded", () => {
     });
 
     // Onglet par défaut
-    document.querySelector('#sidebar-tabs button[data-tab="metar"]').click();
+    const defaultTab = document.querySelector('#sidebar-tabs button[data-tab="metar"]');
+    if (defaultTab) defaultTab.click();
 
     // --------------------------------------------------
     // Heatmap toggle
@@ -63,6 +64,7 @@ window.addEventListener("DOMContentLoaded", () => {
     safeLoadFids();
     loadSonometers();
     checkApiStatus();
+    loadLogs();
     startLiveLogs();
 
     // --------------------------------------------------
@@ -76,4 +78,3 @@ window.addEventListener("DOMContentLoaded", () => {
 
     console.log("[APP] Cockpit IFR opérationnel");
 });
-
