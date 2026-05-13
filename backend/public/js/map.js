@@ -11,6 +11,7 @@ const adsbLayer = L.layerGroup();
 const adsbTracksLayer = L.layerGroup();
 const adsbLabelsLayer = L.layerGroup();
 let adsbHeatmap = null;
+let approachCorridorLayer = L.layerGroup();
 
 const adsbTracks = new Map(); // key = ICAO/HEX → { positions:[], lastUpdate }
 
@@ -84,6 +85,8 @@ export function initMap() {
     adsbLayer.addTo(map);
     adsbTracksLayer.addTo(map);
     adsbLabelsLayer.addTo(map);
+
+    approachCorridorLayer.addTo(map);
 
     // Heatmap bruit
     adsbHeatmap = L.heatLayer([], {
@@ -241,6 +244,90 @@ export async function updateADSB() {
     } catch (e) {
         console.error("[ADSB] Erreur chargement", e);
     }
+}
+// ------------------------------------------------------
+// APPROACH CORRIDOR PRO+++
+// ------------------------------------------------------
+export function drawApproachCorridor(runway) {
+    approachCorridorLayer.clearLayers();
+    if (!runway) return;
+
+    // Coordonnées des pistes EBLG
+    const RWY = {
+        "22": {
+            start: [50.64695, 5.44340],
+            end:   [50.64455, 5.46515],
+            heading: 220
+        },
+        "04": {
+            start: [50.64455, 5.46515],
+            end:   [50.64695, 5.44340],
+            heading: 40
+        }
+    };
+
+    const r = RWY[runway];
+    if (!r) return;
+
+    // Paramètres corridor
+    const corridorLengthNM = 12;   // longueur 12 NM
+    const corridorWidthNM  = 1.2;  // largeur 1.2 NM
+
+    const NM = 1852; // mètres
+
+    // Convertir heading en radians
+    const rad = (r.heading - 180) * Math.PI / 180;
+
+    // Point de départ = seuil piste
+    const [lat0, lon0] = r.start;
+
+    // Calcul du point final du corridor
+    const lat1 = lat0 + (corridorLengthNM * NM) * Math.cos(rad) / 111320;
+    const lon1 = lon0 + (corridorLengthNM * NM) * Math.sin(rad) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    // Largeur corridor
+    const w = corridorWidthNM * NM;
+
+    // Vecteur perpendiculaire
+    const perp = rad + Math.PI/2;
+
+    const latL0 = lat0 + (w/2) * Math.cos(perp) / 111320;
+    const lonL0 = lon0 + (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const latR0 = lat0 - (w/2) * Math.cos(perp) / 111320;
+    const lonR0 = lon0 - (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const latL1 = lat1 + (w/2) * Math.cos(perp) / 111320;
+    const lonL1 = lon1 + (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const latR1 = lat1 - (w/2) * Math.cos(perp) / 111320;
+    const lonR1 = lon1 - (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    // Polygone corridor
+    const polygon = L.polygon([
+        [latL0, lonL0],
+        [latL1, lonL1],
+        [latR1, lonR1],
+        [latR0, lonR0]
+    ], {
+        color: "orange",
+        weight: 2,
+        fillColor: "orange",
+        fillOpacity: 0.15
+    }).addTo(approachCorridorLayer);
+
+    // Flèche directionnelle
+    L.polylineDecorator([[lat0, lon0], [lat1, lon1]], {
+        patterns: [{
+            offset: "50%",
+            repeat: 0,
+            symbol: L.Symbol.arrowHead({
+                pixelSize: 18,
+                polygon: false,
+                pathOptions: { color: "orange", weight: 3 }
+            })
+        }]
+    }).addTo(approachCorridorLayer);
 }
 
 // Mise à jour automatique
