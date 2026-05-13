@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -20,8 +19,6 @@ app.use(express.static(publicDir));
 // --------------------------------------------------
 // ADS-B OpenSky PRO+++ (cache + normalisation)
 // --------------------------------------------------
-import fetch from "node-fetch";
-
 let adsbCache = null;
 let adsbCacheTime = 0;
 
