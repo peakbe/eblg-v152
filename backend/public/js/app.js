@@ -11,6 +11,14 @@ import { loadSonometers } from "./sonometers.js";
 import { checkApiStatus } from "./status.js";
 import { loadLogs } from "./logs.js";
 import { startLiveLogs } from "./logsLive.js";
+import { initMetar } from "./metar.js";
+import { initMap } from "./map.js";
+
+window.addEventListener("DOMContentLoaded", () => {
+    initMap();
+    initMetar();
+    // ... le reste
+});
 
 // =========================
 // BOUTON HEATMAP ON/OFF
@@ -31,7 +39,8 @@ if (noiseHeatBtn) {
 // =========================
 
 window.addEventListener("DOMContentLoaded", () => {
-    initMap();
+    import { initMetar } from "./metar.js";
+    import { initMap } from "./map.js";
     // ...
     updateADSB();
 });
