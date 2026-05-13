@@ -10,7 +10,6 @@
 
 import { ENDPOINTS } from "./config.js";
 import { fetchJSON } from "./helpers.js";
-import { updateNoiseHeatmap } from "./map.js";
 
 let markersLayer = null;
 let clusterLayer = null;
@@ -55,7 +54,7 @@ export async function loadSonometers() {
     const data = await fetchJSON(ENDPOINTS.sonometers);
 
     updateSonometersUI(data);
-    updateNoiseHeatmap(data); // ← Heatmap dynamique PRO+++
+
 }
 
 // ------------------------------------------------------
