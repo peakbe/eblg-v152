@@ -4,52 +4,47 @@
 
 import { initMap, resetMapView, toggleNoiseHeatmap } from "./map.js";
 import { updateADSB } from "./map.js";
-import { safeLoadMetar } from "./metar.js";
+import { initMetar, safeLoadMetar } from "./metar.js";
 import { safeLoadTaf } from "./taf.js";
 import { safeLoadFids } from "./fids.js";
 import { loadSonometers } from "./sonometers.js";
 import { checkApiStatus } from "./status.js";
 import { loadLogs } from "./logs.js";
 import { startLiveLogs } from "./logsLive.js";
-import { initMetar } from "./metar.js";
-import { initMap } from "./map.js";
 
+// ======================================================
+// DOMContentLoaded — pipeline cockpit IFR
+// ======================================================
 window.addEventListener("DOMContentLoaded", () => {
-    initMap();
-    initMetar();
-    // ... le reste
-});
-
-// =========================
-// BOUTON HEATMAP ON/OFF
-// =========================
-let noiseHeatmapEnabled = true;
-
-const noiseHeatBtn = document.getElementById("btn-noiseheat-toggle");
-if (noiseHeatBtn) {
-    noiseHeatBtn.addEventListener("click", () => {
-        noiseHeatmapEnabled = !noiseHeatmapEnabled;
-        toggleNoiseHeatmap(noiseHeatmapEnabled);
-        noiseHeatBtn.textContent = noiseHeatmapEnabled ? "Heatmap ON" : "Heatmap OFF";
-    });
-}
-
-// =========================
-// DOMContentLoaded
-// =========================
-
-window.addEventListener("DOMContentLoaded", () => {
-    import { initMetar } from "./metar.js";
-    import { initMap } from "./map.js";
-    // ...
-    updateADSB();
-});
 
     console.log("[APP] Initialisation cockpit IFR…");
 
-    // --------------------------------------------------
-    // Gestion des onglets
-    // --------------------------------------------------
+    // 1) Carte
+    initMap();
+
+    // 2) METAR (piste active + corridor + glide path)
+    initMetar();
+
+    // 3) Modules secondaires
+    safeLoadTaf();
+    safeLoadFids();
+    loadSonometers();
+    checkApiStatus();
+    loadLogs();
+    startLiveLogs();
+
+    // 4) ADS-B (Airlabs)
+    updateADSB();
+    setInterval(updateADSB, 8000);
+
+    // 5) Rafraîchissements périodiques
+    setInterval(safeLoadMetar, 60_000);
+    setInterval(safeLoadTaf, 5 * 60_000);
+    setInterval(safeLoadFids, 60_000);
+    setInterval(loadSonometers, 60_000);
+    setInterval(checkApiStatus, 30_000);
+
+    // 6) Gestion des onglets
     const tabs = document.querySelectorAll("#sidebar-tabs button");
     const panels = document.querySelectorAll("#sidebar-panels .panel");
 
@@ -65,45 +60,26 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Onglet par défaut
     const defaultTab = document.querySelector('#sidebar-tabs button[data-tab="metar"]');
     if (defaultTab) defaultTab.click();
 
-    // --------------------------------------------------
-    // Initialisation carte
-    // --------------------------------------------------
-    initMap();
-    
-    // =========================
-    // BOUTON RESET MAP
-    // =========================
-
+    // 7) Bouton reset map
     const resetMapBtn = document.getElementById("btn-reset-map");
     if (resetMapBtn) {
-    resetMapBtn.addEventListener("click", () => {
-        resetMapView();
-    });
-}
+        resetMapBtn.addEventListener("click", () => resetMapView());
+    }
 
-    // --------------------------------------------------
-    // Chargement des modules
-    // --------------------------------------------------
-    safeLoadMetar();     // METAR → piste → corridor → sonomètres
-    safeLoadTaf();
-    safeLoadFids();
-    loadSonometers();
-    checkApiStatus();
-    loadLogs();
-    startLiveLogs();
+    // 8) Heatmap ON/OFF
+    let noiseHeatmapEnabled = true;
+    const noiseHeatBtn = document.getElementById("btn-noiseheat-toggle");
 
-    // --------------------------------------------------
-    // Rafraîchissements périodiques
-    // --------------------------------------------------
-    setInterval(safeLoadMetar, 60_000);
-    setInterval(safeLoadTaf, 5 * 60_000);
-    setInterval(safeLoadFids, 60_000);
-    setInterval(loadSonometers, 60_000);
-    setInterval(checkApiStatus, 30_000);
+    if (noiseHeatBtn) {
+        noiseHeatBtn.addEventListener("click", () => {
+            noiseHeatmapEnabled = !noiseHeatmapEnabled;
+            toggleNoiseHeatmap(noiseHeatmapEnabled);
+            noiseHeatBtn.textContent = noiseHeatmapEnabled ? "Heatmap ON" : "Heatmap OFF";
+        });
+    }
 
     console.log("[APP] Cockpit IFR opérationnel");
 });
