@@ -9,6 +9,8 @@ export let map = null;
 
 const adsbLayer = L.layerGroup();
 const adsbTracksLayer = L.layerGroup();
+const adsbLabelsLayer = L.layerGroup();
+let adsbHeatmap = null;
 
 const adsbTracks = new Map(); // key = ICAO/HEX → { positions:[], lastUpdate }
 
@@ -59,8 +61,7 @@ function passesAdsbFilters(ac) {
     if (spd < adsbFilter.minSpd || spd > adsbFilter.maxSpd) return false;
     if (adsbFilter.types !== "all" && adsbFilter.types !== type) return false;
 
-    return trueconst adsbLabelsLayer = L.layerGroup();
-    
+    return true;
 }
 
 // ------------------------------------------------------
@@ -83,6 +84,14 @@ export function initMap() {
     adsbLayer.addTo(map);
     adsbTracksLayer.addTo(map);
     adsbLabelsLayer.addTo(map);
+
+    // Heatmap bruit
+    adsbHeatmap = L.heatLayer([], {
+        radius: 35,
+        blur: 25,
+        maxZoom: 17,
+        max: 1.0
+    }).addTo(map);
 
     console.log("[MAP] Initialisation OK");
 }
@@ -111,8 +120,8 @@ export async function updateADSB() {
         adsbTracksLayer.clearLayers();
         adsbLabelsLayer.clearLayers();
 
-
         const now = Date.now();
+        const heatPoints = [];
 
         aircraft.forEach(ac => {
             if (!ac.lat || !ac.lon) return;
@@ -151,6 +160,30 @@ export async function updateADSB() {
             }
 
             // -----------------------------
+            // Flèche directionnelle (heading)
+            // -----------------------------
+            if (ac.track) {
+                const arrow = L.polylineDecorator([pos, pos], {
+                    patterns: [
+                        {
+                            offset: 0,
+                            repeat: 0,
+                            symbol: L.Symbol.arrowHead({
+                                pixelSize: 12,
+                                polygon: false,
+                                pathOptions: {
+                                    stroke: true,
+                                    color,
+                                    weight: 2
+                                }
+                            })
+                        }
+                    ]
+                });
+                arrow.addTo(adsbLayer);
+            }
+
+            // -----------------------------
             // Marqueur avion
             // -----------------------------
             const marker = L.circleMarker(pos, {
@@ -159,7 +192,7 @@ export async function updateADSB() {
                 weight: 2,
                 fillColor: color,
                 fillOpacity: 0.9
-            });
+            }).addTo(adsbLayer);
 
             const callsign = ac.call || "N/A";
             const altTxt = alt ? `${alt} ft` : "—";
@@ -174,18 +207,29 @@ export async function updateADSB() {
                 ICAO: ${ac.icao || ac.hex || "?"}
             `);
 
-            marker.addTo(adsbLayer);
-        });
-        
-        // Label dynamique (callsign)
-        const label = L.divIcon({
-        className: "adsb-label",
-        html: `<div class="adsb-label-text">${callsign}</div>`,
-        iconSize: [80, 20],
-        iconAnchor: [40, -10]
-});
+            // -----------------------------
+            // Label dynamique
+            // -----------------------------
+            const label = L.divIcon({
+                className: "adsb-label",
+                html: `<div class="adsb-label-text">${callsign}</div>`,
+                iconSize: [80, 20],
+                iconAnchor: [40, -10]
+            });
 
-L.marker(pos, { icon: label }).addTo(adsbLabelsLayer);
+            L.marker(pos, { icon: label }).addTo(adsbLabelsLayer);
+
+            // -----------------------------
+            // Heatmap bruit synchronisée
+            // -----------------------------
+            const intensity =
+                (1 - Math.min(alt / 20000, 1)) *
+                (Math.min(spd / 300, 1));
+
+            heatPoints.push([ac.lat, ac.lon, intensity]);
+        });
+
+        adsbHeatmap.setLatLngs(heatPoints);
 
         // Nettoyage des traces anciennes
         for (const [key, track] of adsbTracks.entries()) {
