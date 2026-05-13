@@ -2,15 +2,18 @@
 // APP.JS PRO+++ — Cockpit IFR EBLG
 // ======================================================
 
-import { initMap } from "./map.js";
+import { initMap, resetMapView, toggleNoiseHeatmap } from "./map.js";
 import { safeLoadMetar } from "./metar.js";
 import { safeLoadTaf } from "./taf.js";
 import { safeLoadFids } from "./fids.js";
+import { loadSonometers } from "./sonometers.js";
 import { checkApiStatus } from "./status.js";
 import { loadLogs } from "./logs.js";
 import { startLiveLogs } from "./logsLive.js";
-import { toggleNoiseHeatmap } from "./map.js";
 
+// =========================
+// BOUTON HEATMAP ON/OFF
+// =========================
 let noiseHeatmapEnabled = true;
 
 const noiseHeatBtn = document.getElementById("btn-noiseheat-toggle");
@@ -21,6 +24,10 @@ if (noiseHeatBtn) {
         noiseHeatBtn.textContent = noiseHeatmapEnabled ? "Heatmap ON" : "Heatmap OFF";
     });
 }
+
+// =========================
+// DOMContentLoaded
+// =========================
 
 window.addEventListener("DOMContentLoaded", () => {
 
