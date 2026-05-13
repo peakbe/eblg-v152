@@ -10,20 +10,14 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --------------------------------------------------
-// CORS (optionnel si frontend servi par ce même serveur)
-// --------------------------------------------------
+// CORS (optionnel)
 app.use(cors());
 
-// --------------------------------------------------
 // STATIC FRONTEND
-// --------------------------------------------------
-const publicDir = path.join(__dirname, "..");
+const publicDir = path.join(__dirname, "public");
 app.use(express.static(publicDir));
 
-// --------------------------------------------------
 // API ADS-B PROXY
-// --------------------------------------------------
 app.get("/api/adsb", async (req, res) => {
     try {
         const r = await fetch("https://opensky-network.org/api/states/all");
@@ -40,16 +34,12 @@ app.get("/api/adsb", async (req, res) => {
     }
 });
 
-// --------------------------------------------------
-// FALLBACK SPA (si tu as un index.html unique)
-// --------------------------------------------------
+// FALLBACK SPA
 app.get("*", (req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));
 });
 
-// --------------------------------------------------
 // START
-// --------------------------------------------------
 app.listen(PORT, () => {
     console.log(`[SERVER] Listening on port ${PORT}`);
 });
