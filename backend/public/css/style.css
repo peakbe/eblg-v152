@@ -226,3 +226,12 @@ body {
     background: #4b5563;
     border-radius: 999px;
 }
+
+.adsb-label-text {
+    color: #00eaff;
+    font-size: 12px;
+    font-weight: bold;
+    text-shadow: 0 0 4px #000;
+    text-align: center;
+    pointer-events: none;
+}
