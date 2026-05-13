@@ -214,9 +214,9 @@ export function drawApproachCorridor(rwy) {
 
     const pts = [
         RWY22,
-        [50.6300, 5.4200], // 3 NM
-        [50.6200, 5.4000], // 6 NM
-        [50.6100, 5.3800]  // 9 NM
+        [50.6300, 5.4200],
+        [50.6200, 5.4000],
+        [50.6100, 5.3800]
     ];
 
     L.polyline(pts, {
@@ -238,8 +238,8 @@ export function drawDepartureCorridor(rwy) {
 
     const pts = [
         RWY04,
-        [50.6650, 5.4800], // montée initiale
-        [50.6800, 5.5000]  // montée vers 3000 ft
+        [50.6650, 5.4800],
+        [50.6800, 5.5000]
     ];
 
     L.polyline(pts, {
