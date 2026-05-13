@@ -2,20 +2,21 @@
 // MAP.JS — EBLG Cockpit IFR PRO+++
 // ======================================================
 
-// ------------------------------------------------------
-// 1. Variables globales
-// ------------------------------------------------------
 export let map = null;
 
+// Couches
 const adsbLayer = L.layerGroup();
 const adsbTracksLayer = L.layerGroup();
 const adsbLabelsLayer = L.layerGroup();
 let adsbHeatmap = null;
+
 let approachCorridorLayer = L.layerGroup();
+let departureCorridorLayer = L.layerGroup();
+let noiseZoneLayer = L.layerGroup();
+let glidePathLayer = L.layerGroup();
 
-const adsbTracks = new Map(); // key = ICAO/HEX → { positions:[], lastUpdate }
+const adsbTracks = new Map(); // key → { positions:[], lastUpdate }
 
-// Filtres avion
 let adsbFilter = {
     minAlt: 0,
     maxAlt: 45000,
@@ -25,7 +26,7 @@ let adsbFilter = {
 };
 
 // ------------------------------------------------------
-// 2. Helpers style avion
+// Helpers style avion
 // ------------------------------------------------------
 function getAdsbColorByAlt(altFt) {
     if (!altFt) return "#888";
@@ -66,7 +67,7 @@ function passesAdsbFilters(ac) {
 }
 
 // ------------------------------------------------------
-// 3. Initialisation de la carte
+// Initialisation carte
 // ------------------------------------------------------
 export function initMap() {
     map = L.map("map", {
@@ -75,20 +76,15 @@ export function initMap() {
         maxZoom: 18
     }).setView([50.64, 5.45], 11);
 
-    // Fond de carte
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap"
     }).addTo(map);
 
-    // Couches ADS-B
     adsbLayer.addTo(map);
     adsbTracksLayer.addTo(map);
     adsbLabelsLayer.addTo(map);
 
-    approachCorridorLayer.addTo(map);
-
-    // Heatmap bruit
     adsbHeatmap = L.heatLayer([], {
         radius: 35,
         blur: 25,
@@ -96,19 +92,201 @@ export function initMap() {
         max: 1.0
     }).addTo(map);
 
+    approachCorridorLayer.addTo(map);
+    departureCorridorLayer.addTo(map);
+    noiseZoneLayer.addTo(map);
+    glidePathLayer.addTo(map);
+
+    drawNoiseAbatementZones();
+
     console.log("[MAP] Initialisation OK");
 }
 
-// ------------------------------------------------------
-// 4. Reset map
-// ------------------------------------------------------
 export function resetMapView() {
     if (!map) return;
     map.setView([50.64, 5.45], 11);
 }
 
 // ------------------------------------------------------
-// 5. ADSBexchange PRO+++
+// Géométrie pistes EBLG
+// ------------------------------------------------------
+const RWY = {
+    "22": {
+        start: [50.64695, 5.44340],
+        end:   [50.64455, 5.46515],
+        heading: 220
+    },
+    "04": {
+        start: [50.64455, 5.46515],
+        end:   [50.64695, 5.44340],
+        heading: 40
+    }
+};
+
+const NM = 1852;
+
+// ------------------------------------------------------
+// Corridors + glide path + noise
+// ------------------------------------------------------
+export function drawApproachCorridor(runway) {
+    approachCorridorLayer.clearLayers();
+    glidePathLayer.clearLayers();
+    if (!runway || !RWY[runway]) return;
+
+    const r = RWY[runway];
+
+    const corridorLengthNM = 12;
+    const corridorWidthNM  = 1.2;
+
+    const rad = (r.heading - 180) * Math.PI / 180;
+    const [lat0, lon0] = r.start;
+
+    const lat1 = lat0 + (corridorLengthNM * NM) * Math.cos(rad) / 111320;
+    const lon1 = lon0 + (corridorLengthNM * NM) * Math.sin(rad) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const w = corridorWidthNM * NM;
+    const perp = rad + Math.PI/2;
+
+    const latL0 = lat0 + (w/2) * Math.cos(perp) / 111320;
+    const lonL0 = lon0 + (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const latR0 = lat0 - (w/2) * Math.cos(perp) / 111320;
+    const lonR0 = lon0 - (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const latL1 = lat1 + (w/2) * Math.cos(perp) / 111320;
+    const lonL1 = lon1 + (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const latR1 = lat1 - (w/2) * Math.cos(perp) / 111320;
+    const lonR1 = lon1 - (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    L.polygon([
+        [latL0, lonL0],
+        [latL1, lonL1],
+        [latR1, lonR1],
+        [latR0, lonR0]
+    ], {
+        color: "orange",
+        weight: 2,
+        fillColor: "orange",
+        fillOpacity: 0.15
+    }).addTo(approachCorridorLayer);
+
+    L.polylineDecorator([[lat0, lon0], [lat1, lon1]], {
+        patterns: [{
+            offset: "50%",
+            repeat: 0,
+            symbol: L.Symbol.arrowHead({
+                pixelSize: 18,
+                polygon: false,
+                pathOptions: { color: "orange", weight: 3 }
+            })
+        }]
+    }).addTo(approachCorridorLayer);
+
+    drawGlidePath(runway);
+}
+
+export function drawDepartureCorridor(runway) {
+    departureCorridorLayer.clearLayers();
+    if (!runway || !RWY[runway]) return;
+
+    const r = RWY[runway];
+
+    const corridorLengthNM = 10;
+    const corridorWidthNM  = 1.5;
+
+    const rad = (r.heading) * Math.PI / 180;
+    const [lat0, lon0] = r.end;
+
+    const lat1 = lat0 + (corridorLengthNM * NM) * Math.cos(rad) / 111320;
+    const lon1 = lon0 + (corridorLengthNM * NM) * Math.sin(rad) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const w = corridorWidthNM * NM;
+    const perp = rad + Math.PI/2;
+
+    const latL0 = lat0 + (w/2) * Math.cos(perp) / 111320;
+    const lonL0 = lon0 + (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const latR0 = lat0 - (w/2) * Math.cos(perp) / 111320;
+    const lonR0 = lon0 - (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const latL1 = lat1 + (w/2) * Math.cos(perp) / 111320;
+    const lonL1 = lon1 + (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    const latR1 = lat1 - (w/2) * Math.cos(perp) / 111320;
+    const lonR1 = lon1 - (w/2) * Math.cos(perp) / 111320 / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    L.polygon([
+        [latL0, lonL0],
+        [latL1, lonL1],
+        [latR1, lonR1],
+        [latR0, lonR0]
+    ], {
+        color: "#ff9f1c",
+        weight: 2,
+        fillColor: "#ff9f1c",
+        fillOpacity: 0.12
+    }).addTo(departureCorridorLayer);
+
+    L.polylineDecorator([[lat0, lon0], [lat1, lon1]], {
+        patterns: [{
+            offset: "50%",
+            repeat: 0,
+            symbol: L.Symbol.arrowHead({
+                pixelSize: 18,
+                polygon: false,
+                pathOptions: { color: "#ff9f1c", weight: 3 }
+            })
+        }]
+    }).addTo(departureCorridorLayer);
+}
+
+export function drawGlidePath(runway) {
+    glidePathLayer.clearLayers();
+    if (!runway || !RWY[runway]) return;
+
+    const r = RWY[runway];
+
+    const gpLengthNM = 10;
+    const rad = (r.heading - 180) * Math.PI / 180;
+    const [lat0, lon0] = r.start;
+
+    const lat1 = lat0 + (gpLengthNM * NM) * Math.cos(rad) / 111320;
+    const lon1 = lon0 + (gpLengthNM * NM) * Math.sin(rad) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
+
+    L.polyline([[lat0, lon0], [lat1, lon1]], {
+        color: "#00ff88",
+        weight: 2,
+        dashArray: "6,4"
+    }).addTo(glidePathLayer);
+}
+
+export function drawNoiseAbatementZones() {
+    noiseZoneLayer.clearLayers();
+
+    // Exemple simple : deux zones au NE et SW de l’aéroport
+    const zone1 = L.circle([50.66, 5.47], {
+        radius: 2500,
+        color: "#ff006e",
+        weight: 1,
+        fillColor: "#ff006e",
+        fillOpacity: 0.08
+    });
+
+    const zone2 = L.circle([50.63, 5.42], {
+        radius: 2500,
+        color: "#ff006e",
+        weight: 1,
+        fillColor: "#ff006e",
+        fillOpacity: 0.08
+    });
+
+    zone1.addTo(noiseZoneLayer);
+    zone2.addTo(noiseZoneLayer);
+}
+
+// ------------------------------------------------------
+// ADSBexchange PRO+++
 // ------------------------------------------------------
 export async function updateADSB() {
     try {
@@ -133,9 +311,6 @@ export async function updateADSB() {
             const key = ac.icao || ac.hex || ac.id || `${ac.lat}-${ac.lon}`;
             const pos = [ac.lat, ac.lon];
 
-            // -----------------------------
-            // Ghost tracks
-            // -----------------------------
             let track = adsbTracks.get(key);
             if (!track) {
                 track = { positions: [], lastUpdate: now };
@@ -144,16 +319,12 @@ export async function updateADSB() {
 
             track.positions.push(pos);
             track.lastUpdate = now;
-
-            if (track.positions.length > 40) {
-                track.positions.shift();
-            }
+            if (track.positions.length > 40) track.positions.shift();
 
             const alt = ac.alt_baro || 0;
             const spd = ac.gs || 0;
             const color = getAdsbColorByAlt(alt);
 
-            // Trace
             if (track.positions.length > 1) {
                 L.polyline(track.positions, {
                     color,
@@ -162,33 +333,20 @@ export async function updateADSB() {
                 }).addTo(adsbTracksLayer);
             }
 
-            // -----------------------------
-            // Flèche directionnelle (heading)
-            // -----------------------------
             if (ac.track) {
-                const arrow = L.polylineDecorator([pos, pos], {
-                    patterns: [
-                        {
-                            offset: 0,
-                            repeat: 0,
-                            symbol: L.Symbol.arrowHead({
-                                pixelSize: 12,
-                                polygon: false,
-                                pathOptions: {
-                                    stroke: true,
-                                    color,
-                                    weight: 2
-                                }
-                            })
-                        }
-                    ]
-                });
-                arrow.addTo(adsbLayer);
+                L.polylineDecorator([pos, pos], {
+                    patterns: [{
+                        offset: 0,
+                        repeat: 0,
+                        symbol: L.Symbol.arrowHead({
+                            pixelSize: 12,
+                            polygon: false,
+                            pathOptions: { color, weight: 2 }
+                        })
+                    }]
+                }).addTo(adsbLayer);
             }
 
-            // -----------------------------
-            // Marqueur avion
-            // -----------------------------
             const marker = L.circleMarker(pos, {
                 radius: getAdsbRadiusBySpeed(spd),
                 color,
@@ -210,9 +368,6 @@ export async function updateADSB() {
                 ICAO: ${ac.icao || ac.hex || "?"}
             `);
 
-            // -----------------------------
-            // Label dynamique
-            // -----------------------------
             const label = L.divIcon({
                 className: "adsb-label",
                 html: `<div class="adsb-label-text">${callsign}</div>`,
@@ -222,9 +377,6 @@ export async function updateADSB() {
 
             L.marker(pos, { icon: label }).addTo(adsbLabelsLayer);
 
-            // -----------------------------
-            // Heatmap bruit synchronisée
-            // -----------------------------
             const intensity =
                 (1 - Math.min(alt / 20000, 1)) *
                 (Math.min(spd / 300, 1));
@@ -234,7 +386,6 @@ export async function updateADSB() {
 
         adsbHeatmap.setLatLngs(heatPoints);
 
-        // Nettoyage des traces anciennes
         for (const [key, track] of adsbTracks.entries()) {
             if (now - track.lastUpdate > 60000) {
                 adsbTracks.delete(key);
@@ -245,90 +396,5 @@ export async function updateADSB() {
         console.error("[ADSB] Erreur chargement", e);
     }
 }
-// ------------------------------------------------------
-// APPROACH CORRIDOR PRO+++
-// ------------------------------------------------------
-export function drawApproachCorridor(runway) {
-    approachCorridorLayer.clearLayers();
-    if (!runway) return;
 
-    // Coordonnées des pistes EBLG
-    const RWY = {
-        "22": {
-            start: [50.64695, 5.44340],
-            end:   [50.64455, 5.46515],
-            heading: 220
-        },
-        "04": {
-            start: [50.64455, 5.46515],
-            end:   [50.64695, 5.44340],
-            heading: 40
-        }
-    };
-
-    const r = RWY[runway];
-    if (!r) return;
-
-    // Paramètres corridor
-    const corridorLengthNM = 12;   // longueur 12 NM
-    const corridorWidthNM  = 1.2;  // largeur 1.2 NM
-
-    const NM = 1852; // mètres
-
-    // Convertir heading en radians
-    const rad = (r.heading - 180) * Math.PI / 180;
-
-    // Point de départ = seuil piste
-    const [lat0, lon0] = r.start;
-
-    // Calcul du point final du corridor
-    const lat1 = lat0 + (corridorLengthNM * NM) * Math.cos(rad) / 111320;
-    const lon1 = lon0 + (corridorLengthNM * NM) * Math.sin(rad) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
-
-    // Largeur corridor
-    const w = corridorWidthNM * NM;
-
-    // Vecteur perpendiculaire
-    const perp = rad + Math.PI/2;
-
-    const latL0 = lat0 + (w/2) * Math.cos(perp) / 111320;
-    const lonL0 = lon0 + (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
-
-    const latR0 = lat0 - (w/2) * Math.cos(perp) / 111320;
-    const lonR0 = lon0 - (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
-
-    const latL1 = lat1 + (w/2) * Math.cos(perp) / 111320;
-    const lonL1 = lon1 + (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
-
-    const latR1 = lat1 - (w/2) * Math.cos(perp) / 111320;
-    const lonR1 = lon1 - (w/2) * Math.sin(perp) / (40075000 * Math.cos(lat0 * Math.PI/180) / 360);
-
-    // Polygone corridor
-    const polygon = L.polygon([
-        [latL0, lonL0],
-        [latL1, lonL1],
-        [latR1, lonR1],
-        [latR0, lonR0]
-    ], {
-        color: "orange",
-        weight: 2,
-        fillColor: "orange",
-        fillOpacity: 0.15
-    }).addTo(approachCorridorLayer);
-
-    // Flèche directionnelle
-    L.polylineDecorator([[lat0, lon0], [lat1, lon1]], {
-        patterns: [{
-            offset: "50%",
-            repeat: 0,
-            symbol: L.Symbol.arrowHead({
-                pixelSize: 18,
-                polygon: false,
-                pathOptions: { color: "orange", weight: 3 }
-            })
-        }]
-    }).addTo(approachCorridorLayer);
-}
-
-// Mise à jour automatique
 setInterval(updateADSB, 8000);
